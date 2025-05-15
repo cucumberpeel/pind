@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import UserPins from './UserPins';
 
 function Profile() {
     const { username } = useParams();
@@ -66,9 +67,7 @@ function Profile() {
                 )}
                 </>
             )}
-            <section>
-                <h2>Pins</h2>
-            </section>
+            <UserPins />
             <section>
                 <h2>Boards</h2>
             </section>

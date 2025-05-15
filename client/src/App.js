@@ -5,6 +5,7 @@ import Profile from './components/profile/Profile';
 import Login from './components/login/Login';
 import Signup from './components/login/Signup';
 import Pin from './components/create/Pin';
+import Board from './components/create/Board';
 import ProtectedRoute from './components/ProtectedRoute';
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
@@ -21,6 +22,7 @@ function App() {
         {/*  TO DO: protect routes (not working :( ) */}
         {/* <Route element={<ProtectedRoute />}> */}
           <Route path="/pin" element={<Pin />} />
+          <Route path="/board" element={<Board />} />
           <Route path="/updates" />
         {/* </Route> */}
       </Routes>

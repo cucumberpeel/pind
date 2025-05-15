@@ -19,7 +19,8 @@ function Header() {
         {user ? (
             <nav id="user-nav">
                 <ul className="nav-list">
-                    <li><a href="/pin">Create</a></li>
+                    <li><a href="/pin">Create Pin</a></li>
+                    <li><a href="/board">Create Board</a></li>
                     <li><a href="/updates">Updates</a></li>
                     <li><a href={`/user/${user?.username}`}>Profile</a></li>
                     <li><button onClick={handleLogout}>Log out</button></li>

@@ -98,7 +98,7 @@ function Pin() {
             { fileError && (
                 <div className="error">{fileError}</div>
             )}
-            <form onSubmit={handleSubmit}>
+            <form encType="multipart/form-data" onSubmit={handleSubmit}>
                 {mode === 'upload' ? (
                     <>
                     <label>Upload Image

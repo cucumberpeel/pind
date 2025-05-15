@@ -10,6 +10,7 @@ import LocalStrategy from 'passport-local';
 import bcrypt from 'bcrypt';
 import multer from 'multer';
 import axios from 'axios';
+import fs from 'fs';
 
 config();
 
@@ -26,7 +27,7 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 const upload = multer({ storage: multer.memoryStorage() });
-app.use('/uploads', express.static('public/uploads'));
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 const pgp = pgPromise();
 const db = pgp(process.env.POSTGRES_URI);
@@ -122,7 +123,27 @@ app.put('/api/edit/:user_id', async (req, res) => {
 
 // create board
 app.post('/api/board', async (req, res) => {
+    const user_id = req?.user?.user_id;
+    if (!user_id) return res.status(401).json({ error: 'Unauthorized' });
 
+    const { title, description, friends_only } = req?.body;
+    try {
+        const result = await db.query(
+            `INSERT INTO public."Board" (title, description, allow_comments, user_id)
+             VALUES ($1, $2, $3, $4) RETURNING *`,
+            [
+                title,
+                description || null,
+                friends_only ? 'friends' : 'public',
+                user_id
+            ]
+        );
+
+        res.status(201).json({ board: result[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to create board' });
+    }
 });
 
 // upload an image
@@ -134,8 +155,13 @@ app.post('/api/pin/upload', upload.single("file"), async (req, res) => {
     if (!file) { return res.status(400).json({ error: 'No file uploaded' })};
     const { tags } = req?.body;
 
-    const img_url = `/uploads/${Date.now()}-${file.originalname}`;
-    console.log(img_url);
+    const filename = `${Date.now()}-${file.originalname}`;
+    const fullPath = path.join(__dirname, 'public', 'uploads', filename);
+    const img_url = `/uploads/${filename}`;
+    
+    // save file
+    // fs.writeFileSync(`./public${img_url}`, file?.buffer);
+    fs.writeFileSync(fullPath, file?.buffer);
 
     try {
         await db.query('BEGIN');
@@ -242,8 +268,38 @@ app.post('/api/pin/web', async (req, res) => {
     }
 })
 
+// view all of a user's pins
+app.get('/api/user/:username/pins', async (req, res) => {
+    const { username } = req.params;
+
+    try {
+        const userResult = await db.query(
+            `select user_id from public."User" where username = $1`,
+            [username]
+        );
+        if (userResult.length === 0) { return res.status(404).json({ error: 'User not found' }); }
+        const user_id = userResult[0].user_id;
+
+        const pinsResult = await db.query(
+            `select pin_id, origin_id, i.img_id, img_url, page_url, p.created_at from public."Pin" p join public."Image" i 
+            on p.img_id = i.img_id where p.user_id = $1
+             order by p.created_at desc`, [user_id]);
+        res.json({ pins: pinsResult });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch user pins' });
+    }
+});
+
+// view all of a user's boards
+
 // delete a pin
-app.delete('/api/delete/:pin_id', async (req, res) => {
+app.post('/api/delete/:pin_id', async (req, res) => {
+
+});
+
+// delete a board
+app.post('/api/delete/:board_id', async (req, res) => {
 
 });
 // END Signing Up, Creating Boards, and Pinning
@@ -317,8 +373,21 @@ app.get('/api/friends/status/:target_id', async (req, res) => {
 
 // START Repinning and Following
 // repin a picture
-app.post('/api/repin/:img_id', async (req, res) => {
+app.post('/api/pin/:pin_id/repin', async (req, res) => {
+    const user_id = req?.user?.user_id;
+    const origin_id = req?.params?.pin_id;
+    const img_id = req?.body?.img_id;
+    if (!user_id) { return res.status(401).json({ error: 'Unauthorized' })};
 
+    await db.query(`insert into public."Pin" (img_id, origin_id, user_id)
+        values ($1, $2, $3)`, [img_id, origin_id, user_id])
+        .then(() => {
+            res.status(201).json({ message: 'Repin success' });
+        })
+        .catch(err => {
+            console.error(err);
+            res.status(500).json({ error: 'Repin failed' });
+        });
 });
 
 // create a follow stream
