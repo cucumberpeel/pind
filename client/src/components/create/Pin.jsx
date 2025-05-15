@@ -6,8 +6,8 @@ import axios from 'axios';
 function Pin() {
     const [ mode, setMode ] = useState('upload');
     const [ file, setFile ] = useState(null);
-    const [ imgSrc, setImgSrc ] = useState('');
-    const [ pageSrc, setPageSrc ] = useState('');
+    const [ imgUrl, setImgUrl ] = useState('');
+    const [ pageUrl, setPageUrl ] = useState('');
     const [ tags, setTags ] = useState('');
     const [ fileError, setFileError ] = useState('');
     const navigate = useNavigate();
@@ -16,8 +16,8 @@ function Pin() {
     const handleToggle = () => {
         setMode(prev => (prev === 'upload' ? 'web' : 'upload'));
         setFile(null);
-        setImgSrc('');
-        setPageSrc('');
+        setImgUrl('');
+        setPageUrl('');
         setTags('');
         setFileError('');
     }
@@ -27,13 +27,13 @@ function Pin() {
         setFileError('');
     }
 
-    const handleImgSrcChange = (e) => {
-        setImgSrc(e?.target?.value);
+    const handleImgUrlChange = (e) => {
+        setImgUrl(e?.target?.value);
         setFileError('');
     }
 
-    const handlePageSrcChange = (e) => {
-        setPageSrc(e?.target?.value);
+    const handlePageUrlChange = (e) => {
+        setPageUrl(e?.target?.value);
         setFileError('');
     }
 
@@ -41,7 +41,7 @@ function Pin() {
         setTags(e?.target?.value);
     }
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         const endpoint = mode === 'upload' ? 'http://localhost:8080/api/pin/upload' : 'http://localhost:8080/api/pin/web';
         const data = new FormData();
@@ -52,40 +52,41 @@ function Pin() {
                 return;
             }
             data.append('file', file);
+            data.append('tags', tags);
+
+            await axios.post(endpoint, data, { headers: { 'Content-Type': 'multipart/form-data' }})
+            .then(() => {
+                setFile(null);
+                setTags('');
+                navigate(`/user/${user?.username}`);
+            })
+            .catch(err => {
+                console.error(err);
+                setFileError('There was an issue uploading your file. Please try again.');
+            });
         }
         else {
-            if (!imgSrc || !pageSrc) {
+            if (!imgUrl || !pageUrl) {
                 setFileError('Please provide both image and website URLs.');
                 return;
             }
-            data.append('img_src', imgSrc);
-            data.append('page_src', pageSrc);
-        }
-        data.append('tags', tags);
-
-        console.log(data.entries());
-        axios.post(endpoint, data, { headers: { 'Content-Type': 'multipart/form-data' }})
-        .then(() => {
-            setFile(null);
-            setImgSrc('');
-            setPageSrc('');
-            setTags('');
-            navigate(`/user/${user?.username}`);
-        })
-        .catch(err => {
-            console.error(err);
-            setFileError('There was an issue creating your pin. Please try again.');
-            
-            // on failure, retain form values
-            if (mode === 'upload') {
-                setImgSrc('');
-                setPageSrc('');
+            const payload = {
+                img_url: imgUrl,
+                page_url: pageUrl,
+                tags: tags
             }
-            else {
-                setFile(null);
+            await axios.post(endpoint, payload, { headers: { 'Content-Type': 'application/json' }})
+            .then(() => {
+                setImgUrl('');
+                setPageUrl('');
                 setTags('');
-            }
-        });
+                navigate(`/user/${user?.username}`);
+            })
+            .catch(err => {
+                console.error(err);
+                setFileError('There was an issue retrieving your image. Please try again.');
+            });
+        }
     }
 
     return (
@@ -101,16 +102,16 @@ function Pin() {
                 {mode === 'upload' ? (
                     <>
                     <label>Upload Image
-                        <input type="file" name="img" accept="image/png, image/jpg, image/jpeg" onChange={handleFileChange} required />
+                        <input type="file" accept="image/png, image/jpg, image/jpeg" onChange={handleFileChange} required />
                     </label>
                     </>
                 ) : (
                     <>
                     <label>Image URL
-                        <input type="url" name="imgSrc" value={imgSrc} onChange={handleImgSrcChange} placeholder="Enter image link" required />
+                        <input type="url" name="imgUrl" value={imgUrl} onChange={handleImgUrlChange} placeholder="Enter image link" required />
                     </label>
                     <label>Website URL
-                        <input type="url" name="pageSrc" value={pageSrc} onChange={handlePageSrcChange} placeholder="Enter website" required />
+                        <input type="url" name="pageUrl" value={pageUrl} onChange={handlePageUrlChange} placeholder="Enter website" required />
                     </label>
                     </>
                 )}

@@ -9,6 +9,7 @@ import session from 'express-session';
 import LocalStrategy from 'passport-local';
 import bcrypt from 'bcrypt';
 import multer from 'multer';
+import axios from 'axios';
 
 config();
 
@@ -168,18 +169,77 @@ app.post('/api/pin/upload', upload.single("file"), async (req, res) => {
             }
         }
         await db.query('COMMIT');
-        res.status(201).json({ message: 'Uploaded new image' });
+        res.status(201).json({ message: 'Uploaded new image from file' });
     }
     catch (err) {
         await db.query('ROLLBACK');
         console.error(err);
-        res.status(500).json({ message: 'Image upload failed' });
+        res.status(500).json({ message: 'Image upload from file failed' });
     }
 });
 
 // save an image from the web
 app.post('/api/pin/web', async (req, res) => {
-    
+    const user_id = req?.user?.user_id;
+    if (!user_id) return res.status(401).json({ error: 'Unauthorized' });
+    const { img_url, page_url, tags } = req?.body;
+    if (!img_url || !page_url) { return res.status(400).json({ error: 'Missing URL' })};
+
+    // download image
+    let img_blob;
+    try {
+        const imageResponse = await axios.get(img_url, {
+            responseType: 'arraybuffer',
+            timeout: 5000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        img_blob = imageResponse?.data;
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error downloading image' });
+        return;
+    }
+
+    try {
+        await db.query('BEGIN');
+        // upload to Image
+        const imageResult = await db.query(`insert into public."Image" (img_url, user_id, page_url, img_blob)
+            values ($1, $2, $3, $4) returning img_id`, [img_url, user_id, page_url, img_blob]);
+            const img_id = imageResult[0].img_id;
+        // add Pin
+        const pinResult = await db.query(`insert into public."Pin" (img_id, user_id)
+            values ($1, $2) returning pin_id`, [img_id, user_id]);
+        const pin_id = pinResult[0].pin_id;
+        // add Tag and ImageTag
+        if (tags) {
+            const tagList = tags.split(',').map(t => t.trim().toLowerCase());
+            let tag_id;
+            for (let tag of tagList) {
+                const tagCheck = await db.query(`select tag_id from public."Tag"
+                    where tag_name = $1`, [tag]);
+                if (tagCheck.length === 0) {
+                    // add new Tag if needed
+                    const tagResult = await db.query(`insert into public."Tag" (tag_name)
+                        values ($1) returning tag_id`, [tag]);
+                    tag_id = tagResult[0].tag_id;
+                }
+                else {
+                    tag_id = tagCheck[0].tag_id;
+                }
+                // add to ImageTag
+                await db.query(`insert into public."ImageTag" (img_id, tag_id)
+                    values ($1, $2)`, [img_id, tag_id]);
+            }
+        }
+        await db.query('COMMIT');
+        res.status(201).json({ message: 'Uploaded new image from URL' });
+    }
+    catch (err) {
+        await db.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ message: 'Image upload from URL failed' });
+    }
 })
 
 // delete a pin
