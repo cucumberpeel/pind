@@ -4,18 +4,209 @@ import pgPromise from 'pg-promise';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
+import passport from 'passport';
+import session from 'express-session';
+import LocalStrategy from 'passport-local';
+import bcrypt from 'bcrypt';
 
 config();
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use(cors());
+app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(express.json());
+app.use(session({
+    secret: 'secret',
+    resave: false,
+    saveUninitialized: false
+}));
+app.use(passport.initialize());
+app.use(passport.session());
 
 const pgp = pgPromise();
 const db = pgp(process.env.POSTGRES_URI);
 
+passport.use(new LocalStrategy(async (username, password, done) => {
+    try {
+      const result = await db.query(`select * from public."User" where username = $1`, [username]);
+      if (result.length === 0) return done(null, false, { message: 'User not found' });
+  
+      const user = result[0];
+      const match = await bcrypt.compare(password, user.password_hash);
+      if (!match) return done(null, false, { message: 'Wrong password' });
+  
+      return done(null, user);
+    } catch (err) {
+      return done(err);
+    }
+  }));
+  
+  passport.serializeUser((user, done) => {
+    done(null, user.user_id)});
+  passport.deserializeUser(async (id, done) => {
+    try {
+      const result = await db.query(`select * from public."User" where user_id = ${id}`, id);
+      done(null, result[0]);
+    } catch (err) {
+      done(err);
+    }
+  });
+
+// START Signing Up, Creating Boards, and Pinning
+// sign up
+app.post('/api/signup', async (req, res) => {
+    const { username, email, password } = req.body;
+    const password_hash = await bcrypt.hash(password, 10);
+
+    await db.query(`insert into public."User" (username, email, password_hash)
+        values ($1, $2, $3)`, [username, email, password_hash])
+    .then(() => {
+        res.status(201).json({ message: 'Signup successful' });
+    })
+    .catch(err => {
+        console.log(err);
+        res.status(400).json({ error: err })
+    })
+});
+
+// log in
+app.post('/api/login', passport.authenticate('local'), async (req, res) => {
+    res.json({ message: 'Login successful', user: req.user.username });
+});
+
+// log out
+app.get('/api/logout', (req, res) => {
+    req.logout(err => {
+        if (err) {
+            return res.status(500).json({ error: 'Logout failed' });
+        }
+        res.status(200).json({ message: 'Logout successful' });
+    })
+})
+
+// check login status
+app.get('/api/me', (req, res) => {
+    if (req.isAuthenticated()) {
+        res.json({ user: req.user });
+    }
+    else {
+        res.status(401).json({ user: null });
+    }
+});
+
+// go to profile
+app.get('/api/user/:username', async (req, res) => {
+    const { username } = req.params;
+    try {
+        const result = await db.query(`select user_id, username, bio 
+            from public."User" where username = $1`, [username]);
+        if (result.length === 0) {
+            return res.status(404).json({ error: 'User not found' })
+        }
+        res.json({ user: result[0] });
+    }
+    catch (err) {
+        res.status(500).json({ error: 'Server error fetching user' })
+    }
+});
+
+// edit profile
+app.put('/api/edit/:user_id', async (req, res) => {
+
+});
+
+// create board
+app.post('/api/newboard', async (req, res) => {
+
+});
+
+// pin a picture
+app.post('/api/pin', async (req, res) => {
+
+});
+
+// delete a pin
+app.delete('/api/delete/:pin_id', async (req, res) => {
+
+});
+// END Signing Up, Creating Boards, and Pinning
+
+// START Friends
+// send friend request
+app.post('/api/friends/request', async (req, res) => {
+    const { receiver_id } = req?.body;
+    const sender_id = req?.user?.user_id;
+
+    const existing = await db.query(`select * from public."Friendship"
+        where (sender_id = $1 and receiver_id = $2)
+        or (sender_id = $2 and receiver_id = $1)`, [sender_id, receiver_id])
+    if (existing.some(r => r.status === 'accepted' || r.status === 'pending')) {
+      return res.status(400).json({ error: 'Already friends or pending' });
+    }
+  
+    await db.query(`insert into public."Friendship" (sender_id, receiver_id)
+      values ($1, $2)`, [sender_id, receiver_id])
+      .then(() => res.status(201).json({ message: 'Friend request sent' }))
+      .catch(err => res.status(500).json({ error: 'Friend request error' }))
+  });
+// respond to friend request
+
+// check friendship status
+app.get('/api/friends/status/:target_id', async (req, res) => {
+    const user_id = req?.user?.user_id;
+    const target_id = parseInt(req?.params?.target_id);
+    if (!user_id || user_id === target_id) {
+        return res.json({ status: null })
+    }
+    const result = await db.query(`select sender_id, receiver_id, status
+        from public."Friendship"
+        where (sender_id = $1 and receiver_id = $2)
+        or (sender_id = $2 and receiver_id = $1)
+    `, [user_id, target_id]);
+
+    const friendship = result[0];
+    if (!friendship) return res.json({ status: 'none' });
+    if (friendship.status === 'accepted') return res.json({ status: 'friends' });
+    if (friendship.status === 'pending') {
+    return res.json({
+        status: friendship.sender_id === user_id ? 'pending' : 'incoming'
+    });
+    }
+    return res.json({ status: 'none' });
+})
+// END Friends
+
+// START Repinning and Following
+// repin a picture
+app.post('/api/repin/:img_id', async (req, res) => {
+
+});
+
+// create a follow stream
+app.post('/api/newstream', async (req, res) => {
+
+});
+
+// add board to a follow stream
+app.put('/api/addtostream/:stream_id', async (req, res) => {
+
+});
+
+// display follow stream
+app.get('/api/:stream_id', async (req, res) => {
+
+});
+// END Repinning and Following
+
+// START Liking and Commenting
+// END Liking and Commenting
+
+// START Keyword Search
+
+// END Keyword Search
+
+// HOME PAGE
 app.get('/api/boards', async (req, res) => {
     await db.query(`select b.*, u.username
         from public."Board" b join public."User" u
