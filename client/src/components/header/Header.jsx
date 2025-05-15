@@ -15,7 +15,7 @@ function Header() {
 
     return (
     <header id="app-header">
-        <a href="/">Pint</a>
+        <a href="/">Pind</a>
         {user ? (
             <nav id="user-nav">
                 <ul className="nav-list">

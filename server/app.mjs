@@ -150,7 +150,29 @@ app.post('/api/friends/request', async (req, res) => {
       .then(() => res.status(201).json({ message: 'Friend request sent' }))
       .catch(err => res.status(500).json({ error: 'Friend request error' }))
   });
-// respond to friend request
+
+// accept friend request
+app.post('/api/friends/accept', async (req, res) => {
+    const { sender_id } = req?.body;
+    const receiver_id = req?.user?.user_id;
+    console.log(sender_id, receiver_id)
+
+    await db.query(`update public."Friendship" set status = 'accepted'
+        where sender_id = $1 and receiver_id = $2 and status = 'pending'`, [sender_id, receiver_id])
+        .then(() => res.status(201).json({ message: 'Friend request accepted' }))
+        .catch(err => res.status(500).json({ error: 'Error accepting friend request' }))
+})
+
+// decline friend request
+app.post('/api/friends/decline', async (req, res) => {
+    const { sender_id } = req?.body;
+    const receiver_id = req?.user?.user_id;
+
+    await db.query(`delete from public."Friendship"
+        where sender_id = $1 and receiver_id = $2 and status = 'pending'`, [sender_id, receiver_id])
+        .then(() => res.status(201).json({ message: 'Friend request declined' }))
+        .catch(err => res.status(500).json({ error: 'Error declining friend request' }))
+})
 
 // check friendship status
 app.get('/api/friends/status/:target_id', async (req, res) => {

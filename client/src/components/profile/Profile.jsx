@@ -18,7 +18,6 @@ function Profile() {
 
     useEffect(() => {
         if (!isSelf && user && profile) {
-            console.log(profile?.user_id);
             axios.get(`http://localhost:8080/api/friends/status/${profile?.user_id}`, { withCredentials: true })
             .then(res => setFriendStatus(res?.data?.status))
             .catch(err => console.error(err))
@@ -34,20 +33,17 @@ function Profile() {
         })
     };
 
-    // let friendButton;
-    // switch(friendStatus) {
-    //     case 'pending':
-    //         friendButton = "Pending";
-    //         break;
-    //     case 'friends':
-    //         friendButton = "Friends";
-    //         break;
-    //     case 'none':
-    //         friendButton = "Add Friend";
-    //         break;
-    //     default:
-    //         friendButton = null;
-    // };
+    const handleAccept = () => {
+        axios.post(`http://localhost:8080/api/friends/accept`, { sender_id: profile?.user_id }, { withCredentials: true })
+        .then(() => setFriendStatus('friends'))
+        .catch(err => console.error(err))
+    };
+
+    const handleDecline = () => {
+        axios.post(`http://localhost:8080/api/friends/decline`, { sender_id: profile?.user_id }, { withCredentials: true })
+        .then(() => setFriendStatus('none'))
+        .catch(err => console.error(err))
+    };
 
     return (
         <div className="user-profile">
@@ -55,6 +51,13 @@ function Profile() {
             <p>{profile?.bio}</p>
             {user && !isSelf && (
                 <>
+                {friendStatus === 'incoming' && (
+                    <div>
+                        <p>{profile?.username} wants to be friends</p>
+                        <button onClick={handleAccept}>Accept</button>
+                        <button onClick={handleDecline}>Decline</button>
+                    </div>
+                )}
                 {friendStatus === 'pending' && (
                     <button disabled>Pending</button>
                 )}
