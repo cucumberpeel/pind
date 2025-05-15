@@ -8,6 +8,7 @@ import passport from 'passport';
 import session from 'express-session';
 import LocalStrategy from 'passport-local';
 import bcrypt from 'bcrypt';
+import multer from 'multer';
 
 config();
 
@@ -23,6 +24,8 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
+const upload = multer({ storage: multer.memoryStorage() });
+app.use('/uploads', express.static('public/uploads'));
 
 const pgp = pgPromise();
 const db = pgp(process.env.POSTGRES_URI);
@@ -117,14 +120,67 @@ app.put('/api/edit/:user_id', async (req, res) => {
 });
 
 // create board
-app.post('/api/newboard', async (req, res) => {
+app.post('/api/board', async (req, res) => {
 
 });
 
-// pin a picture
-app.post('/api/pin', async (req, res) => {
+// upload an image
+app.post('/api/pin/upload', upload.single("file"), async (req, res) => {
+    const user_id = req?.user?.user_id;
+    if (!user_id) return res.status(401).json({ error: 'Unauthorized' });
 
+    const file = req?.file;
+    if (!file) { return res.status(400).json({ error: 'No file uploaded' })};
+    const { tags } = req?.body;
+
+    const img_url = `/uploads/${Date.now()}-${file.originalname}`;
+    console.log(img_url);
+
+    try {
+        await db.query('BEGIN');
+        // upload to Image
+        const imageResult = await db.query(`insert into public."Image" (img_url, user_id, img_blob)
+            values ($1, $2, $3) returning img_id`, [img_url, user_id, file?.buffer]);
+        const img_id = imageResult[0].img_id;
+        // add Pin
+        const pinResult = await db.query(`insert into public."Pin" (img_id, user_id)
+            values ($1, $2) returning pin_id`, [img_id, user_id]);
+        const pin_id = pinResult[0].pin_id;
+        // add Tag and ImageTag
+        if (tags) {
+            const tagList = tags.split(',').map(t => t.trim().toLowerCase());
+            let tag_id;
+            for (let tag of tagList) {
+                const tagCheck = await db.query(`select tag_id from public."Tag"
+                    where tag_name = $1`, [tag]);
+                if (tagCheck.length === 0) {
+                    // add new Tag if needed
+                    const tagResult = await db.query(`insert into public."Tag" (tag_name)
+                        values ($1) returning tag_id`, [tag]);
+                    tag_id = tagResult[0].tag_id;
+                }
+                else {
+                    tag_id = tagCheck[0].tag_id;
+                }
+                // add to ImageTag
+                await db.query(`insert into public."ImageTag" (img_id, tag_id)
+                    values ($1, $2)`, [img_id, tag_id]);
+            }
+        }
+        await db.query('COMMIT');
+        res.status(201).json({ message: 'Uploaded new image' });
+    }
+    catch (err) {
+        await db.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ message: 'Image upload failed' });
+    }
 });
+
+// save an image from the web
+app.post('/api/pin/web', async (req, res) => {
+    
+})
 
 // delete a pin
 app.delete('/api/delete/:pin_id', async (req, res) => {
@@ -206,7 +262,7 @@ app.post('/api/repin/:img_id', async (req, res) => {
 });
 
 // create a follow stream
-app.post('/api/newstream', async (req, res) => {
+app.post('/api/stream', async (req, res) => {
 
 });
 

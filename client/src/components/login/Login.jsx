@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 
@@ -11,18 +11,22 @@ function Login() {
     const [ loginError, setLoginError ] = useState('');
     const navigate = useNavigate();
     const { fetchUser } = useAuth();
+    // const [ searchParams ] = useSearchParams();
 
-    const handleLogin = () => {
+    const handleLogin = async () => {
         if (!username || !password) {
             setLoginError('All fields required');
         }
         else {
-            axios.post('http://localhost:8080/api/login', { username, password })
-            .then(res => {
-                fetchUser();
-                navigate('/');
+            await axios.post('http://localhost:8080/api/login', { username, password })
+            .then(async () => {
+                await fetchUser();
+                // const next = searchParams.get('next') || `/user/${username}`;
+                // navigate(next, { replace: true });
+                navigate(`/user/${username}`);
             })
-            .catch(() => {
+            .catch(err => {
+                console.error(err);
                 setLoginError('Invalid username or password. Please try again.');
                 setUsername('');
                 setPassword('');

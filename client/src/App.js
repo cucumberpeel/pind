@@ -4,11 +4,11 @@ import Header from './components/header/Header';
 import Profile from './components/profile/Profile';
 import Login from './components/login/Login';
 import Signup from './components/login/Signup';
-import ReactDOM from "react-dom/client";
+import Pin from './components/create/Pin';
+import ProtectedRoute from './components/ProtectedRoute';
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 function App() {
-
   return (
     <BrowserRouter>
       <Header />
@@ -17,6 +17,12 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/user/:username" element={<Profile />} />
+
+        {/*  TO DO: protect routes (not working :( ) */}
+        {/* <Route element={<ProtectedRoute />}> */}
+          <Route path="/pin" element={<Pin />} />
+          <Route path="/updates" />
+        {/* </Route> */}
       </Routes>
     </BrowserRouter>
   );
