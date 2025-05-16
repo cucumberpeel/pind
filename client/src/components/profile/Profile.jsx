@@ -12,6 +12,7 @@ function Profile() {
     const [ friendStatus, setFriendStatus ] = useState(null);
     const [ pins, setPins ] = useState([]);
     const [ boards, setBoards ] = useState([]);
+    const [ followStreams, setFollowStreams ] = useState([]);
 
     useEffect(() => {
         axios.get(`http://localhost:8080/api/user/${username}`)
@@ -52,13 +53,19 @@ function Profile() {
         axios.get(`http://localhost:8080/api/user/${username}/boards`)
         .then(res => setBoards(res?.data?.boards))
         .catch(err => console.error(err))
-    }, [username, boards]);
+    }, [username]);
 
     useEffect(() => {
         axios.get(`http://localhost:8080/api/user/${username}/pins`)
         .then(res => setPins(res?.data?.pins))
         .catch(err => console.error(err))
-    }, [username, pins]);
+    }, [username]);
+
+    useEffect(() => {
+        axios.get(`http://localhost:8080/api/user/${username}/streams`)
+        .then(res => setFollowStreams(res?.data?.streams))
+        .catch(err => console.error(err))
+    }, [username]);
 
     return (
         <div className="user-profile">
@@ -81,12 +88,21 @@ function Profile() {
                 )}
                 </>
             )}
-            <Feed pins={pins} boards={boards} />
             {isSelf && (
                 <section>
-                    <h2>My Follow Streams</h2>
+                    <h2>Follow Streams</h2>
+                    {followStreams.length === 0 ? (
+                        <p>No follow streams yet. <a href="/followstream">Create your first one!</a></p>
+                    ) : (
+                        followStreams.map(fs => (
+                            <div className="stream-thumbnail" key={fs?.stream_id}>
+                                <h3>{fs?.stream_name}</h3>
+                            </div>
+                        ))
+                    )}
                 </section>
             )}
+            <Feed pins={pins} boards={boards} />
         </div>
     )
 };

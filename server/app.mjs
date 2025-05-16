@@ -281,13 +281,26 @@ app.get('/api/user/:username/pins', async (req, res) => {
         const user_id = userResult[0].user_id;
 
         const pinsResult = await db.query(
-            `select pin_id, origin_id, i.img_id, img_url, page_url, p.created_at from public."Pin" p join public."Image" i 
+            `select * from public."Pin" p join public."Image" i 
             on p.img_id = i.img_id where p.user_id = $1
              order by p.created_at desc`, [user_id]);
         res.json({ pins: pinsResult });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to fetch user pins' });
+    }
+});
+
+// view all pins
+app.get('/api/pins', async (req, res) => {
+    try {
+        const pinsResult = await db.query(
+            `select * from public."Pin" p join public."Image" i 
+            on p.img_id = i.img_id order by p.created_at desc`);
+        res.json({ pins: pinsResult });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch all pins' });
     }
 });
 
@@ -311,7 +324,21 @@ app.get('/api/user/:username/boards', async (req, res) => {
         console.error(err);
         res.status(500).json({ error: 'Failed to fetch user boards' });
     }
-})
+});
+
+// view all boards
+app.get('/api/boards', async (req, res) => {
+    try {
+        const boardsResult = await db.query(`select b.*, u.username
+            from public."Board" b join public."User" u
+            on b.user_id = u.user_id
+            order by created_at desc`);
+        res.json({ boards: boardsResult });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch all boards' });
+    }
+});
 
 // delete a pin
 app.post('/api/delete/:pin_id', async (req, res) => {
@@ -419,39 +446,188 @@ app.post('/api/pin/:pin_id/repin', async (req, res) => {
 
 // create a follow stream
 app.post('/api/stream', async (req, res) => {
+    const title = req?.body?.title;
+    const user_id = req?.user?.user_id;
+    if (!user_id) { return res.status(401).json({ error: 'Unauthorized' })}
 
+    await db.query(`insert into public."FollowStream" (stream_name, user_id)
+        values ($1, $2)`, [title, user_id])
+        .then(() => res.status(201).json({ message: 'Stream created' }))
+        .catch(err => {
+            console.error(err);
+            res.status(500).json({ error: 'Stream creation error' });
+        })
 });
 
 // add board to a follow stream
-app.put('/api/addtostream/:stream_id', async (req, res) => {
+app.post('/api/streamboard/:stream_id', async (req, res) => {
 
 });
 
-// display follow stream
-app.get('/api/:stream_id', async (req, res) => {
+// get all follow streams of a user
+app.get('/api/user/:username/streams', async (req, res) => {
+    const { username } = req?.params;
+    if (req?.user?.username != username) { return res.status(401).json({ error: 'Unauthorized' })}
 
-});
+    try {
+        const streamResult = await db.query(`select * from public."FollowStream"
+            where user_id = $1 order by created_at desc`, [req?.user?.user_id]);
+        res.json({ streams: streamResult });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch follow streams' })
+    }
+})
+
 // END Repinning and Following
 
 // START Liking and Commenting
+// like an image
+app.post('/api/like', async (req, res) => {
+    const { img_id } = req?.body;
+    const user_id = req?.user?.user_id;
+    if (!user_id) { return res.status(401).json({ error: 'Unauthorized' })};
+    if (!img_id) { return res.status(400).json({ error: 'Missing image ID' })};
+
+    await db.query(`insert into public."Like" (img_id, user_id)
+        values ($1, $2) on conflict (img_id, user_id) do nothing`, [img_id, user_id])
+        .then(() => res.status(200).json({ message: 'Like success' }))
+        .catch(err => {
+            console.error(err);
+            res.status(500).json({ error: 'Like failed' });
+        })
+});
+
+// remove like from an image
+app.post('/api/delete/like', async (req, res) => {
+    const { img_id } = req?.body;
+    const user_id = req?.user?.user_id;
+    if (!user_id) { return res.status(401).json({ error: 'Unauthorized' })};
+    if (!img_id) { return res.status(400).json({ error: 'Missing image ID' })};
+
+    await db.query(`delete from public."Like" where img_id = $1 and user_id = $2`, [img_id, user_id])
+        .then(() => res.status(200).json({ message: 'Unlike success' }))
+        .catch(err => {
+            console.error(err);
+            res.status(500).json({ error: 'Unlike failed' });
+        })
+});
+
+// get likes on an image
+app.get('/api/likes/:img_id', async (req, res) => {
+    const { img_id } = req?.params;
+    const user_id = req?.user?.user_id;
+
+    try {
+        const likeResult = await db.query(`select count(*) from public."Like" 
+            where img_id = $1`, [img_id]);
+        
+        let hasLiked = false;
+
+        if (user_id) {
+            const likeCheck = await db.query(
+            'SELECT 1 FROM "Like" WHERE img_id = $1 AND user_id = $2',
+            [img_id, user_id]
+            );
+            hasLiked = likeCheck.length > 0;
+        }
+
+        res.json({ img_id, likes: parseInt(likeResult[0].count), liked_by_user: hasLiked });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch likes' });
+    }
+})
+
+// comment on an image
+app.post('/api/comment', async (req, res) => {
+    const { pin_id, text } = req?.body;
+    const user_id = req?.user?.user_id;
+    if (!user_id) { return res.status(401).json({ error: 'Unauthorized' })};
+    if (!pin_id || !text) { return res.status(400).json({ error: 'Missing comment info' })};
+
+    try {
+        // check comment permissions
+        const boardResult = await db.query(`select allow_comments, user_id as owner_id
+            from public."BoardPin" bp join public."Board" b on bp.board_id = b.board_id
+            where bp.pin_id = $1 `, [pin_id]);
+
+        // check friendship
+        if (boardResult.length > 0) {
+            const { allow_comments, owner_id } = boardResult[0];
+            if (allow_comments === 'friends' && user_id != owner_id) {
+                const friendResult = await db.query(`select 1 from public."Friendship"
+                    where (sender_id = $1 and receiver_id = $2) or (sender_id = $2 and receiver_id = $1) 
+                    and status = 'accepted'`, [user_id, owner_id]);
+                if (friendResult.length === 0) { return res.status(403).json({ error: 'No permission to comment' })}
+            }
+        }
+
+        // insert comment
+        await db.query(`insert into public."Comment" (pin_id, user_id, comment)
+            values ($1, $2, $3)`, [pin_id, user_id, text])
+            .then(() => res.status(200).json({ message: 'Comment success' }))
+            .catch(err => {
+                console.error(err);
+                res.status(500).json({ error: 'Comment failed' });
+            })
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Comment failed' });
+    }
+});
+
+// get comments on a pin
+app.get('/api/comments/:pin_id', async (req, res) => {
+    const { pin_id } = req?.params;
+
+    try {
+        const commentsResult = await db.query(`select comment, c.created_at, u.user_id, username
+            from public."Comment" c join public."User" u on c.user_id = u.user_id
+            where c.pin_id = $1 order by c.created_at desc`, [pin_id]);
+        
+        let can_comment = true;
+        // check comment permissions
+        const boardResult = await db.query(`select allow_comments, user_id as owner_id
+            from public."BoardPin" bp join public."Board" b on bp.board_id = b.board_id
+            where bp.pin_id = $1 `, [pin_id]);
+
+        // check friendship
+        if (boardResult.length > 0) {
+            const { allow_comments, owner_id } = boardResult[0];
+            if (allow_comments === 'friends' && user_id != owner_id) {
+                const friendResult = await db.query(`select 1 from public."Friendship"
+                    where (sender_id = $1 and receiver_id = $2) or (sender_id = $2 and receiver_id = $1) 
+                    and status = 'accepted'`, [user_id, owner_id]);
+                if (friendResult.length === 0) { can_comment = false; }
+            }
+        }
+
+        res.json({ pin_id, comments: commentsResult, can_comment: can_comment });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch comments' });
+    }
+})
 // END Liking and Commenting
 
 // START Keyword Search
+app.get('/api/search', async (req, res) => {
+    const { tag } = req?.query;
 
-// END Keyword Search
-
-// HOME PAGE
-app.get('/api/boards', async (req, res) => {
-    await db.query(`select b.*, u.username
-        from public."Board" b join public."User" u
-        on b.user_id = u.user_id
-        order by created_at desc`)
-    .then((data) => {
-        res.json({ boards: data });
-    })
-    .catch((error) => {
-        res.status(500).send({ message: error });
-    });
+    try {
+        const searchResult = db.query(`select i.*, p.*, tag_name from public."ImageTag" it
+        join public."Tag" t on it.tag_id = t.tag_id
+        join public."Image" i on it.img_id = i.img_id
+        join public."Pin" p on i.img_id = p.img_id
+        where t.tag_name like '%$1%'
+        order by p.created_at desc`, [query]);
+        res.json({ results: searchResult });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Search failed' });
+    }
 });
+// END Keyword Search
 
 app.listen(process.env.SERVER_PORT || 8080);
