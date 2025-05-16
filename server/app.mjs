@@ -292,6 +292,26 @@ app.get('/api/user/:username/pins', async (req, res) => {
 });
 
 // view all of a user's boards
+app.get('/api/user/:username/boards', async (req, res) => {
+    const { username } = req.params;
+
+    try {
+        const userResult = await db.query(
+            `select user_id from public."User" where username = $1`,
+            [username]
+        );
+        if (userResult.length === 0) { return res.status(404).json({ error: 'User not found' }); }
+        const user_id = userResult[0].user_id;
+
+        const boardsResult = await db.query(
+            `select * from public."Board" where user_id = $1
+             order by created_at desc`, [user_id]);
+        res.json({ boards: boardsResult });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch user boards' });
+    }
+})
 
 // delete a pin
 app.post('/api/delete/:pin_id', async (req, res) => {
@@ -377,17 +397,24 @@ app.post('/api/pin/:pin_id/repin', async (req, res) => {
     const user_id = req?.user?.user_id;
     const origin_id = req?.params?.pin_id;
     const img_id = req?.body?.img_id;
+    const board_id = req?.body?.board_id;
     if (!user_id) { return res.status(401).json({ error: 'Unauthorized' })};
 
-    await db.query(`insert into public."Pin" (img_id, origin_id, user_id)
-        values ($1, $2, $3)`, [img_id, origin_id, user_id])
-        .then(() => {
-            res.status(201).json({ message: 'Repin success' });
-        })
-        .catch(err => {
-            console.error(err);
-            res.status(500).json({ error: 'Repin failed' });
-        });
+    try {
+        const pinResult = await db.query(`insert into public."Pin" (img_id, origin_id, user_id)
+        values ($1, $2, $3) returning pin_id`, [img_id, origin_id, user_id]);
+        const pin_id = pinResult[0].pin_id;
+
+        if (board_id) {
+            await db.query(`insert into public."BoardPin" (board_id, pin_id)
+                values ($1, $2)`, [board_id, pin_id]);
+        }
+        res.status(201).json({ message: 'Repin success' });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Repin failed' });
+    }
 });
 
 // create a follow stream

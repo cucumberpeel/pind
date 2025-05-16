@@ -2,7 +2,7 @@ import { useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
-import UserPins from './UserPins';
+import Feed from '../content/Feed';
 
 function Profile() {
     const { username } = useParams();
@@ -10,6 +10,8 @@ function Profile() {
     const [ profile, setProfile ] = useState(null);
     const isSelf = user?.username === username;
     const [ friendStatus, setFriendStatus ] = useState(null);
+    const [ pins, setPins ] = useState([]);
+    const [ boards, setBoards ] = useState([]);
 
     useEffect(() => {
         axios.get(`http://localhost:8080/api/user/${username}`)
@@ -46,6 +48,18 @@ function Profile() {
         .catch(err => console.error(err))
     };
 
+    useEffect(() => {
+        axios.get(`http://localhost:8080/api/user/${username}/boards`)
+        .then(res => setBoards(res?.data?.boards))
+        .catch(err => console.error(err))
+    }, [username, boards]);
+
+    useEffect(() => {
+        axios.get(`http://localhost:8080/api/user/${username}/pins`)
+        .then(res => setPins(res?.data?.pins))
+        .catch(err => console.error(err))
+    }, [username, pins]);
+
     return (
         <div className="user-profile">
             <h1>{profile?.username}</h1>
@@ -67,10 +81,7 @@ function Profile() {
                 )}
                 </>
             )}
-            <UserPins />
-            <section>
-                <h2>Boards</h2>
-            </section>
+            <Feed pins={pins} boards={boards} />
             {isSelf && (
                 <section>
                     <h2>My Follow Streams</h2>
