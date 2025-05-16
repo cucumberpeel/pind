@@ -8,6 +8,7 @@ function Home() {
     const [ pins, setPins ] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
+    const [ searched, setSearched ] = useState(false);
 
     useEffect(() => {
         axios.get('http://localhost:8080/api/boards')
@@ -27,23 +28,29 @@ function Home() {
         .catch(err => console.error(err))
     }, []);
 
-    const handleSearch = (e) => {
+    const handleSearch = async (e) => {
         e.preventDefault();
-        axios.get(`http://localhost:8080/api/search?tag=${searchQuery}`)
+        await axios.get(`http://localhost:8080/api/search?tag=${searchQuery}`)
             .then(res => {
                 setSearchResults(res?.data?.results || []);
+                setSearched(true);
                 setSearchQuery('');
             })
             .catch(err => console.error('Search failed:', err));
     };
 
+    const handleSearchChange = (e) => {
+        setSearchQuery(e?.target?.value);
+        setSearched(false);
+    }
+
     return (
         <div id="home">
             <form onSubmit={handleSearch}>
-                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e?.target?.value)} placeholder="Search Pint" />
+                <input type="text" value={searchQuery} onChange={handleSearchChange} placeholder="Search Pint" />
                 <button type="submit">Search</button>
             </form>
-            {searchResults ? (
+            {searched ? (
                 <SearchResults pins={searchResults} />
             ) : (
                 <Feed pins={pins} boards={boards} />

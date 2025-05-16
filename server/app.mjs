@@ -614,14 +614,15 @@ app.get('/api/comments/:pin_id', async (req, res) => {
 // START Keyword Search
 app.get('/api/search', async (req, res) => {
     const { tag } = req?.query;
+    console.log(tag, `%${tag}%`);
 
     try {
-        const searchResult = db.query(`select i.*, p.*, tag_name from public."ImageTag" it
+        const searchResult = await db.query(`select i.*, p.*, tag_name from public."ImageTag" it
         join public."Tag" t on it.tag_id = t.tag_id
         join public."Image" i on it.img_id = i.img_id
         join public."Pin" p on i.img_id = p.img_id
-        where t.tag_name like '%$1%'
-        order by p.created_at desc`, [query]);
+        where t.tag_name like $1
+        order by p.created_at desc`, [`%${tag}%`]);
         res.json({ results: searchResult });
     } catch (err) {
         console.error(err);
