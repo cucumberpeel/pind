@@ -2,6 +2,23 @@ import axios from 'axios';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import {
+    Card,
+    CardMedia,
+    CardContent,
+    CardActions,
+    Typography,
+    Button,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+  } from '@mui/material';
 
 function PinFeed({ pins }) {
     const { user } = useAuth();
@@ -119,69 +136,106 @@ function PinFeed({ pins }) {
     };
 
     return (
-        <section>
-                <div className="display-pins">
-                    <h2>Pins</h2>
-                    {pins.length > 0 ? (pins?.map(p => (
-                        <div key={p?.pin_id}>
-                            {p.origin_id && ( <p>Repin</p> )}
-
-                            <button onClick={() => handleRepinButton(p?.pin_id)}>Repin</button>
-                            {dialogOpenId === p?.pin_id && (
-                                <div className="repin-modal">
-                                    <select onChange={(e) => setSelectedBoard(e.target.value)} value={selectedBoard || ''}>
-                                    <option value="">No board</option>
-                                    {userBoards?.map(board => (
-                                        <option key={board.board_id} value={board.board_id}>
-                                            {board.title}
-                                        </option>
-                                    ))}
-                                    </select>
-                                    <button onClick={() => handleRepin(p)}>Add pin</button>
-                                    <button onClick={() => handleCancel}>Cancel</button>
-                                </div>
-                            )}
-
-                            {p?.img_url[0] === '/' ? (
-                                <img src={`http://localhost:8080${p?.img_url}`} alt='' />
-                            ) : (
-                                <img src={p?.img_url} alt='' />
-                            )}
-                            {p?.page_url && (
-                                <a href={p?.page_url} target="_blank" rel="noreferrer">View original</a>
-                            )}
-                            <p className="timestamp">{new Date(p?.created_at).toLocaleDateString()}</p>
-
-                            <button key={p?.pin_id} onClick={() => toggleLike(p?.img_id)}>
-                                {likesMap[p?.img_id]?.liked_by_user ? 'Unlike' : 'Like'}
-                            </button>
-                            <p>{likesMap[p?.img_id]?.likes || 0} likes</p>
-                            
-                            {commentsMap[p?.img_id]?.can_comment && (
-                                <form onSubmit={(e) => handleComment(e, p?.pin_id)}>
-                                    <input
-                                        type="text"
-                                        value={commentInput[p?.pin_id] || ''}
-                                        onChange={(e) =>
-                                            setCommentInput({
-                                                ...commentInput,
-                                                [p?.pin_id]: e?.target?.value,
-                                            })
-                                        }
-                                        placeholder="Add a comment..."
-                                    />
-                                    <button type="submit">Post</button>
-                                </form>
-                            )}
-                            <p>{commentsMap[p?.pin_id]?.comments?.length || 0} comments</p>
-                        </div>
-                    ))) : (
-                        <div className="empty">
-                            <p>Oops. Nothing to see here.</p>
-                        </div>
+    <div className="display-pins">
+        <h2>Pins</h2>
+        {pins.length > 0 ? (pins?.map(p => (
+            <Card key={p?.pin_id} sx={{ maxWidth: 345, m: 2 }}>
+                {p.origin_id && (
+                <Typography variant="subtitle2" color="text.secondary" sx={{ p: 1 }}>
+                    Repin
+                </Typography>
+                )}
+                <CardMedia
+                    component="img"
+                    height="194"
+                    image={
+                        p?.img_url[0] === '/'
+                        ? `http://localhost:8080${p?.img_url}`
+                        : p?.img_url
+                    }
+                    alt="Pin"
+                />
+                <CardContent>
+                    {p?.page_url && (
+                        <Typography variant="body2" color="text.secondary">
+                        <a href={p.page_url} target="_blank" rel="noreferrer">
+                            View original
+                        </a>
+                        </Typography>
                     )}
-                </div>
-            </section>
+                    <Typography variant="caption" color="text.secondary">
+                        {new Date(p?.created_at).toLocaleDateString()}
+                    </Typography>
+                </CardContent>
+                <CardActions>
+                    <Button size="small" onClick={() => handleRepinButton(p?.pin_id)}>
+                        Repin
+                    </Button>
+
+                    <Button size="small" onClick={() => toggleLike(p?.img_id)}>
+                        {likesMap[p?.img_id]?.liked_by_user ? 'Unlike' : 'Like'}
+                    </Button>
+                    <Typography variant="caption">
+                        {likesMap[p?.img_id]?.likes || 0} likes
+                    </Typography>
+                </CardActions>
+                {commentsMap[p?.img_id]?.can_comment && (
+          <CardContent>
+            <form onSubmit={(e) => handleComment(e, p?.pin_id)}>
+                <TextField
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    placeholder="Add a comment..."
+                    value={commentInput[p?.pin_id] || ''}
+                    onChange={(e) =>
+                    setCommentInput({
+                        ...commentInput,
+                        [p?.pin_id]: e.target.value,
+                    })
+                    }
+                    />
+                    <Button type="submit" size="small" sx={{ mt: 1 }}>
+                        Post
+                    </Button>
+                    </form>
+                    <Typography variant="caption">
+                    {commentsMap[p?.pin_id]?.comments?.length || 0} comments
+                    </Typography>
+                </CardContent>
+                )}
+
+            <Dialog open={dialogOpenId === p?.pin_id} onClose={handleCancel}>
+                <DialogTitle>Select a Board</DialogTitle>
+                <DialogContent>
+                    <FormControl fullWidth sx={{ mt: 2 }}>
+                    <InputLabel>Board</InputLabel>
+                    <Select
+                        value={selectedBoard || ''}
+                        onChange={(e) => setSelectedBoard(e.target.value)}
+                        label="Board"
+                    >
+                        <MenuItem value="">No board</MenuItem>
+                        {userBoards?.map((board) => (
+                        <MenuItem key={board.board_id} value={board.board_id}>
+                            {board.title}
+                        </MenuItem>
+                        ))}
+                    </Select>
+                    </FormControl>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancel}>Cancel</Button>
+                    <Button onClick={() => handleRepin(p)}>Add pin</Button>
+                </DialogActions>
+            </Dialog>
+        </Card>
+        ))) : (
+            <div className="empty">
+                <Typography variant="body1">Oops. Nothing to see here.</Typography>
+            </div>
+        )}
+    </div>
     );
 };
 

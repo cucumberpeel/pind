@@ -11,6 +11,7 @@ import bcrypt from 'bcrypt';
 import multer from 'multer';
 import axios from 'axios';
 import fs from 'fs';
+import winston from 'winston';
 
 config();
 
@@ -58,6 +59,18 @@ passport.use(new LocalStrategy(async (username, password, done) => {
     }
   });
 
+  const { combine, timestamp, json } = winston.format;
+  const logger = winston.createLogger({
+    level: 'info',
+    format: combine(timestamp(), json()),
+    transports: [
+        new winston.transports.Console(),
+        new winston.transports.File({
+            filename: 'combined.log'
+        })
+    ],
+  });
+
 // START Signing Up, Creating Boards, and Pinning
 // sign up
 app.post('/api/signup', async (req, res) => {
@@ -70,7 +83,7 @@ app.post('/api/signup', async (req, res) => {
         res.status(201).json({ message: 'Signup successful' });
     })
     .catch(err => {
-        console.log(err);
+        logger.error('Signup unsuccessful');
         res.status(400).json({ error: err })
     })
 });
@@ -87,6 +100,7 @@ app.get('/api/logout', (req, res) => {
             return res.status(500).json({ error: 'Logout failed' });
         }
         res.status(200).json({ message: 'Logout successful' });
+        logger.info("Successful logout")
     })
 })
 
@@ -141,7 +155,7 @@ app.post('/api/board', async (req, res) => {
 
         res.status(201).json({ board: result[0] });
     } catch (err) {
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ error: 'Failed to create board' });
     }
 });
@@ -199,7 +213,7 @@ app.post('/api/pin/upload', upload.single("file"), async (req, res) => {
     }
     catch (err) {
         await db.query('ROLLBACK');
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ message: 'Image upload from file failed' });
     }
 });
@@ -222,7 +236,7 @@ app.post('/api/pin/web', async (req, res) => {
         img_blob = imageResponse?.data;
     }
     catch (err) {
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ error: 'Error downloading image' });
         return;
     }
@@ -263,7 +277,7 @@ app.post('/api/pin/web', async (req, res) => {
     }
     catch (err) {
         await db.query('ROLLBACK');
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ message: 'Image upload from URL failed' });
     }
 })
@@ -286,7 +300,7 @@ app.get('/api/user/:username/pins', async (req, res) => {
              order by p.created_at desc`, [user_id]);
         res.json({ pins: pinsResult });
     } catch (err) {
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ error: 'Failed to fetch user pins' });
     }
 });
@@ -299,7 +313,7 @@ app.get('/api/pins', async (req, res) => {
             on p.img_id = i.img_id order by p.created_at desc`);
         res.json({ pins: pinsResult });
     } catch (err) {
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ error: 'Failed to fetch all pins' });
     }
 });
@@ -319,9 +333,34 @@ app.get('/api/user/:username/boards', async (req, res) => {
         const boardsResult = await db.query(
             `select * from public."Board" where user_id = $1
              order by created_at desc`, [user_id]);
-        res.json({ boards: boardsResult });
+
+        const boardIds = boardsResult?.map(b => b.board_id);
+        if (boardIds.length === 0) {
+            return res.json({ boards: [] });
+        };
+
+        const boardPinsResult = await db.query(
+            `select * from public."BoardPin" bp
+             join public."Pin" p on bp.pin_id = p.pin_id
+             join public."Image" i on p.img_id = i.img_id
+             where bp.board_id = any($1::int[])`, [boardIds]);
+
+        const pinsByBoard = {};
+        boardPinsResult?.forEach(pin => {
+            if (!pinsByBoard[pin.board_id]) {
+                pinsByBoard[pin.board_id] = [];
+            }
+            pinsByBoard[pin.board_id].push(pin);
+        });
+
+        const boardsWithPins = boardsResult?.map(board => ({
+            ...board,
+            pins: pinsByBoard[board.board_id] || []
+        }));
+
+        res.json({ boards: boardsWithPins });
     } catch (err) {
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ error: 'Failed to fetch user boards' });
     }
 });
@@ -333,9 +372,34 @@ app.get('/api/boards', async (req, res) => {
             from public."Board" b join public."User" u
             on b.user_id = u.user_id
             order by created_at desc`);
-        res.json({ boards: boardsResult });
+        
+            const boardIds = boardsResult.rows.map(b => b.board_id);
+        if (boardIds.length === 0) {
+            return res.json({ boards: [] });
+        };
+
+        const boardPinsResult = await db.query(
+            `select * from public."BoardPin" bp
+             join public."Pin" p on bp.pin_id = p.pin_id
+             join public."Image" i on p.img_id = i.img_id
+             where bp.board_id = any($1::int[])`, [boardIds]);
+
+            const pinsByBoard = {};
+            boardPinsResult?.forEach(pin => {
+                if (!pinsByBoard[pin.board_id]) {
+                    pinsByBoard[pin.board_id] = [];
+                }
+                pinsByBoard[pin.board_id].push(pin);
+            });
+
+            const boardsWithPins = boardsResult.rows.map(board => ({
+                ...board,
+                pins: pinsByBoard[board.board_id] || []
+            }));
+
+            res.json({ boards: boardsWithPins });
     } catch (err) {
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ error: 'Failed to fetch all boards' });
     }
 });
@@ -374,7 +438,7 @@ app.post('/api/friends/request', async (req, res) => {
 app.post('/api/friends/accept', async (req, res) => {
     const { sender_id } = req?.body;
     const receiver_id = req?.user?.user_id;
-    console.log(sender_id, receiver_id)
+    logger.log(sender_id, receiver_id)
 
     await db.query(`update public."Friendship" set status = 'accepted'
         where sender_id = $1 and receiver_id = $2 and status = 'pending'`, [sender_id, receiver_id])
@@ -439,7 +503,7 @@ app.post('/api/pin/:pin_id/repin', async (req, res) => {
         res.status(201).json({ message: 'Repin success' });
     }
     catch (err) {
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ error: 'Repin failed' });
     }
 });
@@ -454,7 +518,7 @@ app.post('/api/stream', async (req, res) => {
         values ($1, $2)`, [title, user_id])
         .then(() => res.status(201).json({ message: 'Stream created' }))
         .catch(err => {
-            console.error(err);
+            logger.error(err);
             res.status(500).json({ error: 'Stream creation error' });
         })
 });
@@ -474,7 +538,7 @@ app.get('/api/user/:username/streams', async (req, res) => {
             where user_id = $1 order by created_at desc`, [req?.user?.user_id]);
         res.json({ streams: streamResult });
     } catch (err) {
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ error: 'Failed to fetch follow streams' })
     }
 })
@@ -493,7 +557,7 @@ app.post('/api/like', async (req, res) => {
         values ($1, $2) on conflict (img_id, user_id) do nothing`, [img_id, user_id])
         .then(() => res.status(200).json({ message: 'Like success' }))
         .catch(err => {
-            console.error(err);
+            logger.error(err);
             res.status(500).json({ error: 'Like failed' });
         })
 });
@@ -508,7 +572,7 @@ app.post('/api/delete/like', async (req, res) => {
     await db.query(`delete from public."Like" where img_id = $1 and user_id = $2`, [img_id, user_id])
         .then(() => res.status(200).json({ message: 'Unlike success' }))
         .catch(err => {
-            console.error(err);
+            logger.error(err);
             res.status(500).json({ error: 'Unlike failed' });
         })
 });
@@ -534,7 +598,7 @@ app.get('/api/likes/:img_id', async (req, res) => {
 
         res.json({ img_id, likes: parseInt(likeResult[0].count), liked_by_user: hasLiked });
     } catch (err) {
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ error: 'Failed to fetch likes' });
     }
 })
@@ -568,11 +632,11 @@ app.post('/api/comment', async (req, res) => {
             values ($1, $2, $3)`, [pin_id, user_id, text])
             .then(() => res.status(200).json({ message: 'Comment success' }))
             .catch(err => {
-                console.error(err);
+                logger.error(err);
                 res.status(500).json({ error: 'Comment failed' });
             })
     } catch (err) {
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ error: 'Comment failed' });
     }
 });
@@ -605,7 +669,7 @@ app.get('/api/comments/:pin_id', async (req, res) => {
 
         res.json({ pin_id, comments: commentsResult, can_comment: can_comment });
     } catch (err) {
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ error: 'Failed to fetch comments' });
     }
 })
@@ -614,7 +678,7 @@ app.get('/api/comments/:pin_id', async (req, res) => {
 // START Keyword Search
 app.get('/api/search', async (req, res) => {
     const { tag } = req?.query;
-    console.log(tag, `%${tag}%`);
+    logger.log(tag, `%${tag}%`);
 
     try {
         const searchResult = await db.query(`select i.*, p.*, tag_name from public."ImageTag" it
@@ -625,7 +689,7 @@ app.get('/api/search', async (req, res) => {
         order by p.created_at desc`, [`%${tag}%`]);
         res.json({ results: searchResult });
     } catch (err) {
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ error: 'Search failed' });
     }
 });
