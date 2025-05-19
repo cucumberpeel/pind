@@ -1,8 +1,6 @@
 # pind
 React-based Pinterest clone
 
-frontend = [React, Javascript, Material UI]
+frontend = [JavaScript, React, Material UI]
 
-backend = [Express.js, PostgreSQL]
-
-logging = [winson]
+backend = [JavaScript, Express, Passport, Multer, Node.js, PostgreSQL, winson]
