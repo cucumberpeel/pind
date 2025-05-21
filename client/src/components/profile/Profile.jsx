@@ -73,6 +73,9 @@ function Profile() {
             <p>{profile?.bio}</p>
             {user && !isSelf && (
                 <>
+                {friendStatus === 'friends' && (
+                    <div><p>Friends</p></div>
+                )}
                 {friendStatus === 'incoming' && (
                     <div>
                         <p>{profile?.username} wants to be friends</p>

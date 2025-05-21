@@ -34,7 +34,6 @@ function Home() {
             .then(res => {
                 setSearchResults(res?.data?.results || []);
                 setSearched(true);
-                setSearchQuery('');
             })
             .catch(err => console.error('Search failed:', err));
     };

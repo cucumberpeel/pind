@@ -81,16 +81,18 @@ app.post('/api/signup', async (req, res) => {
         values ($1, $2, $3)`, [username, email, password_hash])
     .then(() => {
         res.status(201).json({ message: 'Signup successful' });
+        logger.info("Successful signup", [username, email]);
     })
     .catch(err => {
-        logger.error('Signup unsuccessful');
-        res.status(400).json({ error: err })
+        res.status(400).json({ error: err });
+        logger.error('Signup unsuccessful', [username, email, err]);
     })
 });
 
 // log in
 app.post('/api/login', passport.authenticate('local'), async (req, res) => {
     res.json({ message: 'Login successful', user: req.user.username });
+    logger.info("Login", [req?.user?.username]);
 });
 
 // log out
@@ -100,7 +102,7 @@ app.get('/api/logout', (req, res) => {
             return res.status(500).json({ error: 'Logout failed' });
         }
         res.status(200).json({ message: 'Logout successful' });
-        logger.info("Successful logout")
+        logger.info("Successful logout");
     })
 })
 
@@ -126,7 +128,8 @@ app.get('/api/user/:username', async (req, res) => {
         res.json({ user: result[0] });
     }
     catch (err) {
-        res.status(500).json({ error: 'Server error fetching user' })
+        res.status(500).json({ error: 'Server error fetching user' });
+        logger.error("Failed to fetch profile", [username, err]);
     }
 });
 
@@ -154,9 +157,10 @@ app.post('/api/board', async (req, res) => {
         );
 
         res.status(201).json({ board: result[0] });
+        logger.info("Created board", [user_id, title, description]);
     } catch (err) {
-        logger.error(err);
         res.status(500).json({ error: 'Failed to create board' });
+        logger.error('Failed to create board', [user_id, err]);
     }
 });
 
@@ -210,11 +214,12 @@ app.post('/api/pin/upload', upload.single("file"), async (req, res) => {
         }
         await db.query('COMMIT');
         res.status(201).json({ message: 'Uploaded new image from file' });
+        logger.info("Uploaded new image from file", [user_id, pin_id]);
     }
     catch (err) {
         await db.query('ROLLBACK');
-        logger.error(err);
         res.status(500).json({ message: 'Image upload from file failed' });
+        logger.error('Failed to upload image from file', [user_id, err]);
     }
 });
 
@@ -236,8 +241,8 @@ app.post('/api/pin/web', async (req, res) => {
         img_blob = imageResponse?.data;
     }
     catch (err) {
-        logger.error(err);
         res.status(500).json({ error: 'Error downloading image' });
+        logger.error('Failed to download image from URL', [user_id, err]);
         return;
     }
 
@@ -274,11 +279,12 @@ app.post('/api/pin/web', async (req, res) => {
         }
         await db.query('COMMIT');
         res.status(201).json({ message: 'Uploaded new image from URL' });
+        logger.info("Uploaded new image from URL", [user_id, pin_id]);
     }
     catch (err) {
         await db.query('ROLLBACK');
-        logger.error(err);
         res.status(500).json({ message: 'Image upload from URL failed' });
+        logger.error('Failed to upload image from URL', [user_id, err]);
     }
 })
 
@@ -300,8 +306,8 @@ app.get('/api/user/:username/pins', async (req, res) => {
              order by p.created_at desc`, [user_id]);
         res.json({ pins: pinsResult });
     } catch (err) {
-        logger.error(err);
         res.status(500).json({ error: 'Failed to fetch user pins' });
+        logger.error('Failed to fetch user pins', [user_id, err]);
     }
 });
 
@@ -313,8 +319,8 @@ app.get('/api/pins', async (req, res) => {
             on p.img_id = i.img_id order by p.created_at desc`);
         res.json({ pins: pinsResult });
     } catch (err) {
-        logger.error(err);
         res.status(500).json({ error: 'Failed to fetch all pins' });
+        logger.error('Failed to fetch all pins', [err]);
     }
 });
 
@@ -360,8 +366,8 @@ app.get('/api/user/:username/boards', async (req, res) => {
 
         res.json({ boards: boardsWithPins });
     } catch (err) {
-        logger.error(err);
         res.status(500).json({ error: 'Failed to fetch user boards' });
+        logger.error('Failed to fetch user boards', [user_id, err]);
     }
 });
 
@@ -372,11 +378,10 @@ app.get('/api/boards', async (req, res) => {
             from public."Board" b join public."User" u
             on b.user_id = u.user_id
             order by created_at desc`);
-        
-            const boardIds = boardsResult.rows.map(b => b.board_id);
-        if (boardIds.length === 0) {
+        if (boardsResult.length === 0) {
             return res.json({ boards: [] });
-        };
+        }
+        const boardIds = boardsResult?.map(b => b?.board_id);
 
         const boardPinsResult = await db.query(
             `select * from public."BoardPin" bp
@@ -392,15 +397,15 @@ app.get('/api/boards', async (req, res) => {
                 pinsByBoard[pin.board_id].push(pin);
             });
 
-            const boardsWithPins = boardsResult.rows.map(board => ({
+            const boardsWithPins = boardsResult?.map(board => ({
                 ...board,
                 pins: pinsByBoard[board.board_id] || []
             }));
 
             res.json({ boards: boardsWithPins });
     } catch (err) {
-        logger.error(err);
         res.status(500).json({ error: 'Failed to fetch all boards' });
+        logger.error('Failed to fetch all boards', [err]);
     }
 });
 
@@ -430,20 +435,31 @@ app.post('/api/friends/request', async (req, res) => {
   
     await db.query(`insert into public."Friendship" (sender_id, receiver_id)
       values ($1, $2)`, [sender_id, receiver_id])
-      .then(() => res.status(201).json({ message: 'Friend request sent' }))
-      .catch(err => res.status(500).json({ error: 'Friend request error' }))
+      .then(() => {
+        res.status(201).json({ message: 'Friend request sent' });
+        logger.info("Friend request sent", [sender_id, receiver_id]);
+    })
+      .catch(err => {
+        res.status(500).json({ error: 'Friend request error' });
+        logger.err("Friend request error", [sender_id, receiver_id]);
+    })
   });
 
 // accept friend request
 app.post('/api/friends/accept', async (req, res) => {
     const { sender_id } = req?.body;
     const receiver_id = req?.user?.user_id;
-    logger.log(sender_id, receiver_id)
 
     await db.query(`update public."Friendship" set status = 'accepted'
         where sender_id = $1 and receiver_id = $2 and status = 'pending'`, [sender_id, receiver_id])
-        .then(() => res.status(201).json({ message: 'Friend request accepted' }))
-        .catch(err => res.status(500).json({ error: 'Error accepting friend request' }))
+        .then(() => {
+            res.status(201).json({ message: 'Friend request accepted' });
+            logger.info("Friend request accepted", [sender_id, receiver_id]);
+})
+        .catch(err => {
+            res.status(500).json({ error: 'Error accepting friend request' });
+            logger.err("Error accepting friend request", [sender_id, receiver_id, err]);
+})
 })
 
 // decline friend request
@@ -453,8 +469,14 @@ app.post('/api/friends/decline', async (req, res) => {
 
     await db.query(`delete from public."Friendship"
         where sender_id = $1 and receiver_id = $2 and status = 'pending'`, [sender_id, receiver_id])
-        .then(() => res.status(201).json({ message: 'Friend request declined' }))
-        .catch(err => res.status(500).json({ error: 'Error declining friend request' }))
+        .then(() => {
+            res.status(201).json({ message: 'Friend request declined' });
+            logger.info("Friend request declined", [sender_id, receiver_id]);
+})
+        .catch(err => {
+            res.status(500).json({ error: 'Error declining friend request' });
+            logger.err("Error declining friend request", [sender_id, receiver_id, err]);
+    })
 })
 
 // check friendship status
@@ -501,10 +523,11 @@ app.post('/api/pin/:pin_id/repin', async (req, res) => {
                 values ($1, $2)`, [board_id, pin_id]);
         }
         res.status(201).json({ message: 'Repin success' });
+        logger.info("Repin", [user_id, origin_id]);
     }
     catch (err) {
-        logger.error(err);
         res.status(500).json({ error: 'Repin failed' });
+        logger.err("Repin failed", [user_id, origin_id, err]);
     }
 });
 
@@ -516,10 +539,13 @@ app.post('/api/stream', async (req, res) => {
 
     await db.query(`insert into public."FollowStream" (stream_name, user_id)
         values ($1, $2)`, [title, user_id])
-        .then(() => res.status(201).json({ message: 'Stream created' }))
+        .then(() => {
+            res.status(201).json({ message: 'Stream created' });
+            logger.info("Stream created", [user_id, title]);
+    })
         .catch(err => {
-            logger.error(err);
             res.status(500).json({ error: 'Stream creation error' });
+            logger.err("Stream creation error", [user_id, title, err]);
         })
 });
 
@@ -538,8 +564,8 @@ app.get('/api/user/:username/streams', async (req, res) => {
             where user_id = $1 order by created_at desc`, [req?.user?.user_id]);
         res.json({ streams: streamResult });
     } catch (err) {
-        logger.error(err);
-        res.status(500).json({ error: 'Failed to fetch follow streams' })
+        res.status(500).json({ error: 'Failed to fetch follow streams' });
+        logger.err("Failed to fetch follow streams", [username]);
     }
 })
 
@@ -555,10 +581,13 @@ app.post('/api/like', async (req, res) => {
 
     await db.query(`insert into public."Like" (img_id, user_id)
         values ($1, $2) on conflict (img_id, user_id) do nothing`, [img_id, user_id])
-        .then(() => res.status(200).json({ message: 'Like success' }))
+        .then(() => {
+            res.status(200).json({ message: 'Like success' });
+            logger.info("Like", [user_id, img_id]);
+    })
         .catch(err => {
-            logger.error(err);
             res.status(500).json({ error: 'Like failed' });
+            logger.err("Like failed", [user_id, img_id, err]);
         })
 });
 
@@ -570,10 +599,13 @@ app.post('/api/delete/like', async (req, res) => {
     if (!img_id) { return res.status(400).json({ error: 'Missing image ID' })};
 
     await db.query(`delete from public."Like" where img_id = $1 and user_id = $2`, [img_id, user_id])
-        .then(() => res.status(200).json({ message: 'Unlike success' }))
+        .then(() => {
+            res.status(200).json({ message: 'Unlike success' });
+            logger.info("Unlike", [user_id, img_id]);
+    })
         .catch(err => {
-            logger.error(err);
             res.status(500).json({ error: 'Unlike failed' });
+            logger.err("Unlike failed", [user_id, img_id, err]);
         })
 });
 
@@ -598,8 +630,8 @@ app.get('/api/likes/:img_id', async (req, res) => {
 
         res.json({ img_id, likes: parseInt(likeResult[0].count), liked_by_user: hasLiked });
     } catch (err) {
-        logger.error(err);
         res.status(500).json({ error: 'Failed to fetch likes' });
+        logger.err("Failed to fetch likes", [img_id, err]);
     }
 })
 
@@ -630,14 +662,17 @@ app.post('/api/comment', async (req, res) => {
         // insert comment
         await db.query(`insert into public."Comment" (pin_id, user_id, comment)
             values ($1, $2, $3)`, [pin_id, user_id, text])
-            .then(() => res.status(200).json({ message: 'Comment success' }))
+            .then(() => {
+                res.status(200).json({ message: 'Comment success' });
+                logger.info("Comment", [user_id, pin_id, text]);
+            })
             .catch(err => {
-                logger.error(err);
                 res.status(500).json({ error: 'Comment failed' });
+                logger.err("Comment failed", [user_id, pin_id, text, err]);
             })
     } catch (err) {
-        logger.error(err);
         res.status(500).json({ error: 'Comment failed' });
+        logger.err("Comment failed", [user_id, pin_id, text, err]);
     }
 });
 
@@ -669,8 +704,8 @@ app.get('/api/comments/:pin_id', async (req, res) => {
 
         res.json({ pin_id, comments: commentsResult, can_comment: can_comment });
     } catch (err) {
-        logger.error(err);
         res.status(500).json({ error: 'Failed to fetch comments' });
+        logger.err("Failed to fetch comments", [pin_id, err]);
     }
 })
 // END Liking and Commenting
@@ -678,7 +713,6 @@ app.get('/api/comments/:pin_id', async (req, res) => {
 // START Keyword Search
 app.get('/api/search', async (req, res) => {
     const { tag } = req?.query;
-    logger.log(tag, `%${tag}%`);
 
     try {
         const searchResult = await db.query(`select i.*, p.*, tag_name from public."ImageTag" it
@@ -688,9 +722,10 @@ app.get('/api/search', async (req, res) => {
         where t.tag_name like $1
         order by p.created_at desc`, [`%${tag}%`]);
         res.json({ results: searchResult });
+        logger.info("Search", [tag]);
     } catch (err) {
-        logger.error(err);
         res.status(500).json({ error: 'Search failed' });
+        logger.err("Search failed", [tag, err]);
     }
 });
 // END Keyword Search
