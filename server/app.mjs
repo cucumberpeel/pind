@@ -71,6 +71,8 @@ passport.use(new LocalStrategy(async (username, password, done) => {
     ],
   });
 
+  app.use(express.static('../build'));
+
 // START Signing Up, Creating Boards, and Pinning
 // sign up
 app.post('/api/signup', async (req, res) => {
