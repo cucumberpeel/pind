@@ -5,8 +5,7 @@
   "main": "app.mjs",
   "scripts": {
     "build": "yarn workspace client build",
-    "start": "yarn workspace server start",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "yarn workspace server start"
   },
   "private": true,
   "workspaces": [
