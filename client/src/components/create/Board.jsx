@@ -28,7 +28,7 @@ function Board() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        await axios.post('http://localhost:8080/api/board', { title, description, friendsOnly }, { withCredentials: true })
+        await axios.post('/api/board', { title, description, friendsOnly }, { withCredentials: true })
         .then(() => {
             setTitle('');
             setDescription('');

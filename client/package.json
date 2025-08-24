@@ -25,6 +25,7 @@
     "eject": "react-scripts eject",
     "postbuild": "node postbuild.js"
   },
+  "proxy": "http://localhost:8080",
   "eslintConfig": {
     "extends": [
       "react-app",

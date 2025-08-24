@@ -20,7 +20,7 @@ function FollowStream() {
             return;
         }
         e.preventDefault();
-        await axios.post('http://localhost:8080/api/stream', { title }, { withCredentials: true })
+        await axios.post('/api/stream', { title }, { withCredentials: true })
         .then(() => {
             setTitle('');
             navigate(`/user/${user?.username}`);

@@ -16,9 +16,13 @@ import winston from 'winston';
 config();
 
 const app = express();
+app.use(express.static('../build'));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+
+// TODO: remove for production builds
+app.use(cors({ origin: true, credentials: true }));
+
 app.use(express.json());
 app.use(session({
     secret: 'secret',
@@ -70,8 +74,6 @@ passport.use(new LocalStrategy(async (username, password, done) => {
         })
     ],
   });
-
-  app.use(express.static('../build'));
 
 // START Signing Up, Creating Boards, and Pinning
 // sign up

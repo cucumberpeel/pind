@@ -18,7 +18,7 @@ function Login() {
             setLoginError('All fields required');
         }
         else {
-            await axios.post('http://localhost:8080/api/login', { username, password })
+            await axios.post('/api/login', { username, password })
             .then(async () => {
                 await fetchUser();
                 // const next = searchParams.get('next') || `/user/${username}`;

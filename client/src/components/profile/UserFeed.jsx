@@ -9,13 +9,13 @@ function UserPins() {
     const [ boards, setBoards ] = useState([]);
 
     useEffect(() => {
-        axios.get(`http://localhost:8080/api/user/${username}/pins`)
+        axios.get(`/api/user/${username}/pins`)
         .then(res => setPins(res?.data?.pins))
         .catch(err => console.error(err))
     }, [username, pins]);
 
     useEffect(() => {
-        axios.get(`http://localhost:8080/api/user/${username}/boards`)
+        axios.get(`/api/user/${username}/boards`)
         .then(res => setBoards(res?.data?.boards))
         .catch(err => console.error(err))
     }, [username, boards]);

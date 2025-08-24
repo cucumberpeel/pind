@@ -34,7 +34,7 @@ function PinFeed({ pins }) {
     useEffect(() => {
         pins.length > 0 && pins?.forEach(p => {
             if (!commentsMap[p?.pin_id]) {
-                axios.get(`http://localhost:8080/api/comments/${p?.pin_id}`)
+                axios.get(`/api/comments/${p?.pin_id}`)
                 .then(res => {
                     setCommentsMap(prev => ({
                         ...prev,
@@ -49,7 +49,7 @@ function PinFeed({ pins }) {
     useEffect(() => {
         pins.length > 0 && pins?.forEach(p => {
             if (!likesMap[p?.img_id]) {
-                axios.get(`http://localhost:8080/api/likes/${p?.img_id}`)
+                axios.get(`/api/likes/${p?.img_id}`)
                 .then(res => {
                     setLikesMap(prev => ({
                         ...prev,
@@ -63,7 +63,7 @@ function PinFeed({ pins }) {
     // for choosing boards to repin to
     useEffect(() => {
         if (user?.username) {
-            axios.get(`http://localhost:8080/api/user/${user?.username}/boards`, { withCredentials: true })
+            axios.get(`/api/user/${user?.username}/boards`, { withCredentials: true })
             .then(res => setUserBoards(res?.data?.boards))
             .catch(err => {
                 console.error(err);
@@ -86,7 +86,7 @@ function PinFeed({ pins }) {
     }
 
     const handleRepin = (pin) => {
-        axios.post(`http://localhost:8080/api/pin/${pin?.pin_id}/repin`, { 
+        axios.post(`/api/pin/${pin?.pin_id}/repin`, { 
             pin_id: pin?.pin_id, img_id: pin?.img_id, board_id: selectedBoard || null })
         .then(() => {
             setSelectedBoard('');
@@ -104,7 +104,7 @@ function PinFeed({ pins }) {
         }
         const liked = likesMap[img_id]?.liked_by_user;
       
-        const endpoint = liked ? `http://localhost:8080/api/delete/like` : `http://localhost:8080/api/like`
+        const endpoint = liked ? `/api/delete/like` : `/api/like`
         await axios.post(endpoint, { img_id: img_id }, { withCredentials: true })
           .then(() => {
             setLikesMap(prev => ({
@@ -126,7 +126,7 @@ function PinFeed({ pins }) {
             return;
         }
         e.preventDefault();
-        axios.post(`http://localhost:8080/api/comment`, { pin_id: pin_id })
+        axios.post(`/api/comment`, { pin_id: pin_id })
         .then(() => {
             setCommentInput('');
         })

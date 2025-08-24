@@ -16,7 +16,7 @@ function Signup() {
             setSignupError('All fields required');
         }
         else {
-            axios.post('http://localhost:8080/api/signup', { username, email, password })
+            axios.post('/api/signup', { username, email, password })
             .then(() => {
                 navigate('/');
             })
