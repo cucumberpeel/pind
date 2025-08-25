@@ -16,9 +16,13 @@ import winston from 'winston';
 config();
 
 const app = express();
+app.use(express.static('../client/build'));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+
+// TODO: remove for production builds
+app.use(cors({ origin: true, credentials: true }));
+
 app.use(express.json());
 app.use(session({
     secret: 'secret',
@@ -730,4 +734,4 @@ app.get('/api/search', async (req, res) => {
 });
 // END Keyword Search
 
-app.listen(process.env.SERVER_PORT || 8080);
+app.listen(process.env.PORT || 8080);

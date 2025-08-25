@@ -43,7 +43,7 @@ function Pin() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const endpoint = mode === 'upload' ? 'http://localhost:8080/api/pin/upload' : 'http://localhost:8080/api/pin/web';
+        const endpoint = mode === 'upload' ? '/api/pin/upload' : '/api/pin/web';
         const data = new FormData();
 
         if (mode === 'upload') {

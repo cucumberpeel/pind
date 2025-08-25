@@ -11,7 +11,7 @@ function Home() {
     const [ searched, setSearched ] = useState(false);
 
     useEffect(() => {
-        axios.get('http://localhost:8080/api/boards')
+        axios.get('/api/boards')
         .then(res => {
             console.log('/api/boards', res);
             setBoards(res?.data?.boards);
@@ -20,7 +20,7 @@ function Home() {
     }, []);
 
     useEffect(() => {
-        axios.get('http://localhost:8080/api/pins')
+        axios.get('/api/pins')
         .then(res => {
             console.log('/api/pins', res);
             setPins(res?.data?.pins);
@@ -30,7 +30,7 @@ function Home() {
 
     const handleSearch = async (e) => {
         e.preventDefault();
-        await axios.get(`http://localhost:8080/api/search?tag=${searchQuery}`)
+        await axios.get(`/api/search?tag=${searchQuery}`)
             .then(res => {
                 setSearchResults(res?.data?.results || []);
                 setSearched(true);

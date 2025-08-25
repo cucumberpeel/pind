@@ -4,8 +4,14 @@
   "description": "React-based Pinterest clone",
   "main": "app.mjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "yarn workspace client build",
+    "start": "yarn workspace server start"
   },
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -21,6 +27,7 @@
     "pg-promise": "^11.13.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "yarn": "^1.22.22"
   }
 }

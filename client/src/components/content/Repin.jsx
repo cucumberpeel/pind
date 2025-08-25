@@ -25,7 +25,7 @@
 //     };
 
 //     const handleRepin = () => {
-//         axios.post(`http://localhost:8080/api/pin/${pin_id}/repin`, { pin_id: pin_id, img_id: img_id, board_id: board_id })
+//         axios.post(`/api/pin/${pin_id}/repin`, { pin_id: pin_id, img_id: img_id, board_id: board_id })
 //         .then(() => {
 //             setSelectedBoard(null);
 //             setDialogOpen(false);
