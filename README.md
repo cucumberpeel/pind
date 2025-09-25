@@ -1,5 +1,5 @@
 # pind
-React-based Pinterest clone
+this is harder than it looks
 
 frontend = [JavaScript, React, Material UI]
 
